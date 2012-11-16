@@ -53,7 +53,7 @@ namespace DI.P2P.Tests
             var client1 = module1.Find<ClientInterface>();
             var client2 = module2.Find<ClientInterface>();
 
-            client1.Connect("ROBO", 11112);
+            client1.Connect("localhost", 11112);
 
             AutoResetEvent ack1Event = new AutoResetEvent(false);
             client1.AckReceived += (sender, args) =>
@@ -104,8 +104,8 @@ namespace DI.P2P.Tests
             var client2 = module2.Find<ClientInterface>();
             var client3 = module3.Find<ClientInterface>();
 
-            client1.Connect("ROBO", 11112);
-            client3.Connect("ROBO", 11112);
+            client1.Connect("localhost", 11112);
+            client3.Connect("localhost", 11112);
 
             AutoResetEvent msg1Event = new AutoResetEvent(false);
             client1.MessageReceived += (sender, args) =>
