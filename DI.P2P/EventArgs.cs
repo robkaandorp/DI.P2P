@@ -13,5 +13,6 @@ namespace DI.P2P
         }
 
         public T Data { get; set; }
+
     }
 }
