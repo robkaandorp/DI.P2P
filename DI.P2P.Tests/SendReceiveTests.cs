@@ -84,5 +84,10 @@ namespace DI.P2P.Tests
             module1.Stop();
             module2.Stop();
         }
+
+        [TestMethod]
+        public void RemoveMe()
+        {
+        }
     }
 }
