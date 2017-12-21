@@ -17,12 +17,15 @@ namespace DI.P2P
 
         public class AddPeer
         {
-            public AddPeer(Peer peer)
+            public AddPeer(Peer peer, bool isConnected)
             {
                 this.Peer = peer;
+                this.IsConnected = isConnected;
             }
 
             public Peer Peer { get; }
+
+            public bool IsConnected { get; }
         }
 
         public class AddPeers
@@ -47,28 +50,47 @@ namespace DI.P2P
             public Peer[] Peers { get; }
         }
 
+        public class GetConnectedPeers { }
+
+        public class GetConnectedPeersResponse
+        {
+            public GetConnectedPeersResponse(Peer[] peers)
+            {
+                this.Peers = peers;
+            }
+
+            public Peer[] Peers { get; }
+        }
+
 
         private readonly ILoggingAdapter log = Context.GetLogger();
 
         private readonly List<Peer> peers = new List<Peer>(100);
 
+        private readonly List<Peer> connectedPeers = new List<Peer>(15);
+
         public PeerRegistry(Peer selfPeer)
         {
             this.selfPeer = selfPeer;
 
-            this.Receive<AddPeer>(addPeer => this.ProcessAddPeer(addPeer.Peer));
+            this.Receive<AddPeer>(addPeer => this.ProcessAddPeer(addPeer));
 
             this.Receive<AddPeers>(addPeers => this.ProcessAddPeers(addPeers.Peers));
 
             this.Receive<GetPeers>(_ => this.ProcessGetPeers());
+
+            this.Receive<GetConnectedPeers>(_ => this.ProcessGetConnectedPeers());
         }
 
-        private void ProcessAddPeer(Peer peer)
+        private void Add(Peer peer, bool isConnected)
         {
             // Do not add ourselfs to the registry.
             if (peer.Id == this.selfPeer.Id) return;
 
             var oldPeer = this.peers.FirstOrDefault(p => p.Id == peer.Id);
+
+            // If the information we already have is newer, keep it.
+            if (oldPeer != null && oldPeer.AnnounceTime > peer.AnnounceTime) return;
 
             if (oldPeer != null)
             {
@@ -77,20 +99,37 @@ namespace DI.P2P
 
             this.peers.Add(peer);
 
+
+            // Update the connected peers list.
+            if (!isConnected) return;
+
+            var oldConnectedPeer = this.connectedPeers.FirstOrDefault(p => p.Id == peer.Id);
+
+            if (oldConnectedPeer != null)
+            {
+                this.connectedPeers.Remove(oldConnectedPeer);
+            }
+
+            this.connectedPeers.Add(peer);
+        }
+
+        private void ProcessAddPeer(AddPeer addPeer)
+        {
+            this.Add(addPeer.Peer, addPeer.IsConnected);
+
             // Keep latest announced peers at the front of the list.
             this.peers.Sort((a, b) => a.AnnounceTime > b.AnnounceTime ? 1 : -1);
 
-            this.log.Debug($"Add peer {peer} to the registry");
+            this.log.Debug($"Add peer {addPeer.Peer} to the registry");
         }
 
         private void ProcessAddPeers(Peer[] newPeers)
         {
-            foreach (var peer in newPeers)
-            {
-                // Do not add ourselfs to the registry.
-                if (peer.Id == this.selfPeer.Id) continue;
+            var nonConnectedPeers = newPeers.Where(p => this.connectedPeers.All(cp => cp.Id != p.Id));
 
-                this.peers.Add(peer);
+            foreach (var peer in nonConnectedPeers)
+            {
+                this.Add(peer, false);
             }
 
             // Keep latest announced peers at the front of the list.
@@ -102,6 +141,11 @@ namespace DI.P2P
         private void ProcessGetPeers()
         {
             this.Sender.Tell(new GetPeersResponse(this.peers.Take(100).ToArray()));
+        }
+
+        private void ProcessGetConnectedPeers()
+        {
+            this.Sender.Tell(new GetConnectedPeersResponse(this.connectedPeers.ToArray()));
         }
 
         public static Props Props(Peer selfPeer)

@@ -19,6 +19,8 @@
 
         private IActorRef peerPool;
 
+        private IActorRef peerRegistry;
+
         public P2PSystem(Module owner, Peer selfPeer)
         {
             this.selfPeer = selfPeer;
@@ -41,6 +43,7 @@
             this.system = ActorSystem.Create("P2PSystem", config);
             this.tcpServer = this.system.ActorOf(TcpServer.Props(this.selfPeer), "TcpServer");
             this.peerPool = this.system.ActorOf(PeerPool.Props(this.selfPeer), "PeerPool");
+            this.peerRegistry = this.system.ActorOf(PeerRegistry.Props(this.selfPeer), "PeerRegistry");
 
             this.IsRunning = true;
         }

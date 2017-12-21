@@ -53,7 +53,7 @@ namespace DI.P2P
 
         private void SendAnnounceMessage()
         {
-            var response = Context.ActorSelection("/user/PeerPool/PeerRegistry")
+            var response = Context.ActorSelection("/user/PeerRegistry")
                 .Ask<PeerRegistry.GetPeersResponse>(new PeerRegistry.GetPeers()).Result;
 
             this.messageLayer.Tell(
@@ -89,8 +89,8 @@ namespace DI.P2P
                 msg.Peer.IpAddress = response.IpAddress;
             }
 
-            var peerRegistry = Context.ActorSelection("/user/PeerPool/PeerRegistry");
-            peerRegistry.Tell(new PeerRegistry.AddPeer(msg.Peer));
+            var peerRegistry = Context.ActorSelection("/user/PeerRegistry");
+            peerRegistry.Tell(new PeerRegistry.AddPeer(msg.Peer, true));
 
             if (msg.Peers != null && msg.Peers.Length > 0)
             {
