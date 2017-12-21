@@ -32,7 +32,7 @@ namespace DI.P2P.Entities
 
         public override string ToString()
         {
-            return string.Format("Node(Id = {0}, {1}:{2}) [{3} conn.]", Id, string.Join("|", Adresses), Port, Connections);
+            return string.Format($"Node(Id = {this.Id}, {string.Join("|", this.Adresses)}:{this.Port}) [{this.Connections} conn.]");
         }
     }
 }

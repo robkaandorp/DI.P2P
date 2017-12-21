@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DI.P2P.Console": {
+      "commandName": "Project",
+      "commandLineArgs": "11112 localhost:11111"
+    }
+  }
+}

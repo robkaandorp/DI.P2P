@@ -1,14 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace DI.P2P
+﻿namespace DI.P2P
 {
+    using System.Threading.Tasks;
+
     public interface IRunnable
     {
-        void Start();
-        void Stop();
+        Task Start();
+        Task Stop();
         bool IsRunning { get; }
     }
 }
