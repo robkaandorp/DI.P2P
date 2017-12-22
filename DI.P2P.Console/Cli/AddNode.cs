@@ -21,7 +21,7 @@
                 return false;
             }
 
-            if (!IPAddress.TryParse(commandLine.Parameters[0], out _))
+            if (!IPAddress.TryParse(commandLine.Parameters[0].Split(':')[0], out _))
             {
                 Console.Error.WriteLine("Incorrect ip-address format");
                 return false;
