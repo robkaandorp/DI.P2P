@@ -86,6 +86,8 @@
                         var protocolHandler = Context.ActorOf(ProtocolHandler.Props(this.selfPeer, this.isClient), "ProtocolHandler");
                         var messageLayer = Context.ActorOf(MessageLayer.Props(protocolHandler), "MessageLayer");
                         this.transportLayer = Context.ActorOf(TransportLayer.Props(this.Self, this.transportLayerVersion, messageLayer), "TransportLayer");
+
+                        this.transportLayer.Tell(new TransportLayer.Connected());
                     }
 
                     this.transportLayer.Tell(data);
@@ -101,6 +103,7 @@
 
                 case Tcp.ConnectionClosed _:
                     this.log.Debug($"ConnectionClosed; Shutting down peer.. {message}");
+                    this.transportLayer.Tell(new TransportLayer.Disconnected());
                     this.Self.GracefulStop(TimeSpan.FromSeconds(10));
                     break;
 

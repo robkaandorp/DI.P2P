@@ -22,7 +22,13 @@ namespace DI.P2P
 
         public Task Configure()
         {
-            var selfPeer = new Peer { Id = this.Id, Port = this.Port };
+            var selfPeer = new Peer
+                               {
+                                   Id = this.Id,
+                                   Port = this.Port,
+                                   SoftwareVersion = Versions.SoftwareVersion,
+                                   ProtocolVersion = Versions.ProtocolVersion
+                               };
             return this.Add(new P2PSystem(this, selfPeer));
         }
 

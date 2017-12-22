@@ -25,6 +25,7 @@ namespace DI.P2P
 
         public class EnsureConnectionsMessage { }
 
+
         private readonly ILoggingAdapter log = Context.GetLogger();
 
         public PeerPool(Peer selfPeer)
@@ -39,8 +40,9 @@ namespace DI.P2P
                 commandFailed =>
                     {
                         this.log.Error($"Connection to peer failed. {commandFailed}");
-                        this.Self.GracefulStop(TimeSpan.FromSeconds(10));
                     });
+
+            this.Receive<Tcp.ConnectionClosed>(connectionClosed => this.ProcessConnectionClosed(connectionClosed));
 
             this.Receive<EnsureConnectionsMessage>(_ => this.EnsureConnections());
 
@@ -50,7 +52,9 @@ namespace DI.P2P
 
         private void ProcessConnectTo(ConnectTo connectTo)
         {
-            var endpoint = new DnsEndPoint(connectTo.Peer.IpAddress, connectTo.Peer.Port);
+            Context.System.ActorSelection("/user/PeerRegistry").Tell(new PeerRegistry.TryConnection(connectTo.Peer));
+
+            var endpoint = new IPEndPoint(IPAddress.Parse(connectTo.Peer.IpAddress), connectTo.Peer.Port);
             Context.System.Tcp().Tell(new Tcp.Connect(endpoint));
         }
 
@@ -59,6 +63,11 @@ namespace DI.P2P
             this.log.Debug($"Connected to peer; {connected}");
             var clientConnection = Context.ActorOf(TcpConnection.Props(this.Sender, this.selfPeer, ((IPEndPoint)connected.RemoteAddress).Address.ToString(), true));
             this.Sender.Tell(new Tcp.Register(clientConnection));
+        }
+
+        private void ProcessConnectionClosed(Tcp.ConnectionClosed connectionClosed)
+        {
+            this.log.Error(connectionClosed.Cause);
         }
 
         private void EnsureConnections()
@@ -72,13 +81,16 @@ namespace DI.P2P
                 .Ask<PeerRegistry.GetPeersResponse>(new PeerRegistry.GetPeers()).Result;
 
             var unconnectedPeers = peersResponse.Peers
-                .Where(p => connectedPeersResponse.Peers.All(cp => p.Id != cp.Id))
+                .OrderBy(p => p.ConnectionTries)    // Start trying with peers with the least connection tries
+                .Where(p => connectedPeersResponse.Peers.All(cp => p.Peer.Id != cp.Peer.Id))
                 .Take(2);
 
-            unconnectedPeers.ForEach(
-                p =>
+            unconnectedPeers
+                .ForEach(p =>
                     {
-                        var endpoint = new DnsEndPoint(p.IpAddress, p.Port);
+                        Context.System.ActorSelection("/user/PeerRegistry").Tell(new PeerRegistry.TryConnection(p.Peer));
+
+                        var endpoint = new IPEndPoint(IPAddress.Parse(p.Peer.IpAddress), p.Peer.Port);
                         Context.System.Tcp().Tell(new Tcp.Connect(endpoint));
                     });
         }

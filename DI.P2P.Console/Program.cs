@@ -5,6 +5,10 @@ namespace DI.P2P.Console
 {
     using System.Reflection;
 
+    using Akka.Util.Internal;
+
+    using DI.P2P.Console.Cli;
+
     using log4net;
     using log4net.Config;
     using log4net.Core;
@@ -42,14 +46,15 @@ namespace DI.P2P.Console
             module.Configure().Wait();
             module.Start().Wait();
 
+            var system = module.Find<P2PSystem>();
+
             if (args.Length > 1)
             {
                 // Addnode.
-                var system = module.Find<P2PSystem>();
                 system.AddNode(args[1]);
             }
 
-            Console.ReadLine();
+            new CommandPrompt(system).Start();
 
             log.Info("DI.P2P.Console stopping..");
 

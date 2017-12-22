@@ -19,20 +19,12 @@ namespace DI.P2P
     /// </summary>
     public class MessageLayer : ReceiveActor
     {
-        public class ConnectTransportLayer
-        {
-            public ConnectTransportLayer(IActorRef transportLayer)
-            {
-                this.TransportLayer = transportLayer;
-            }
+        public class Connected { }
 
-            public IActorRef TransportLayer { get; }
-        }
+        public class Disconnected { }
 
 
         private readonly IActorRef protocolHandler;
-
-        private IActorRef transportLayer;
 
         private readonly ILoggingAdapter log = Context.GetLogger();
 
@@ -40,13 +32,13 @@ namespace DI.P2P
         {
             this.protocolHandler = protocolHandler;
 
-            this.Receive<ConnectTransportLayer>(connectTransportLayer => this.transportLayer = connectTransportLayer.TransportLayer);
+            this.Receive<Connected>(connected => protocolHandler.Tell(new ProtocolHandler.Connected()));
+
+            this.Receive<Disconnected>(connected => protocolHandler.Tell(new ProtocolHandler.Disconnected()));
 
             this.Receive<ByteString>(rawMsg => this.ProcessRawIncomingMessage(rawMsg));
 
             this.Receive<Message>(message => this.SendMessage(message));
-
-            protocolHandler.Tell(new ProtocolHandler.ConnectMessageLayer(this.Self));
         }
 
         private void SendMessage(Message message)
@@ -58,7 +50,7 @@ namespace DI.P2P
                 var data = ByteString.CopyFrom(new []{ (byte)message.GetMessageType() });
                 data = data.Concat(ByteString.FromBytes(stream.ToArray()));
 
-                this.transportLayer.Tell(new TransportLayer.SendData(data));
+                Context.ActorSelection("../TransportLayer").Tell(new TransportLayer.SendData(data));
             }
         }
 

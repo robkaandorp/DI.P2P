@@ -10,6 +10,10 @@ namespace DI.P2P
 
     public class TransportLayer : ReceiveActor
     {
+        public class Connected { }
+
+        public class Disconnected { }
+
         public class SendData
         {
             public SendData(ByteString data)
@@ -19,6 +23,7 @@ namespace DI.P2P
 
             public ByteString Data { get; }
         }
+
 
         private readonly IActorRef tcpConnection;
 
@@ -30,6 +35,10 @@ namespace DI.P2P
         {
             this.tcpConnection = tcpConnection;
             this.messageLayer = messageLayer;
+
+            this.Receive<Connected>(connected => messageLayer.Tell(new MessageLayer.Connected()));
+
+            this.Receive<Disconnected>(connected => messageLayer.Tell(new MessageLayer.Disconnected()));
 
             this.Receive<ByteString>(
                 data =>
@@ -47,8 +56,6 @@ namespace DI.P2P
                     });
 
             this.Receive<SendData>(sendData => this.ProcessSendData(sendData));
-
-            this.messageLayer.Tell(new MessageLayer.ConnectTransportLayer(this.Self));
         }
 
         private bool receivingMessage = false;

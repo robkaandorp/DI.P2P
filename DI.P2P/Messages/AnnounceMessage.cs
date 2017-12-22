@@ -13,15 +13,9 @@
         public Peer Peer { get; set; }
 
         [ProtoMember(2)]
-        public Version SoftwareVersion { get; set; }
-
-        [ProtoMember(3)]
-        public Version ProtocolVersion { get; set; }
-
-        [ProtoMember(4)]
         public Peer[] Peers { get; set; }
 
-        [ProtoMember(5)]
+        [ProtoMember(3)]
         public DateTime MyTime { get; set; }
 
         public override MessageEnum GetMessageType()

@@ -4,6 +4,8 @@ using System.Text;
 
 namespace DI.P2P
 {
+    using System.Linq;
+
     using Akka.Actor;
     using Akka.Event;
     using Akka.Util.Internal;
@@ -12,39 +14,28 @@ namespace DI.P2P
 
     public class ProtocolHandler : ReceiveActor
     {
-        public class ConnectMessageLayer
-        {
-            public IActorRef MessageLayer { get; }
+        public class Connected { }
 
-            public ConnectMessageLayer(IActorRef messageLayer)
-            {
-                this.MessageLayer = messageLayer;
-            }
-        }
+        public class Disconnected { }
 
 
         private readonly Peer selfPeer;
 
+        private Peer connectedPeer;
+
         private readonly bool isClient;
 
         private readonly ILoggingAdapter log = Context.GetLogger();
-
-        private IActorRef messageLayer;
 
         public ProtocolHandler(Peer selfPeer, bool isClient)
         {
             this.selfPeer = selfPeer;
             this.isClient = isClient;
 
-            this.Receive<ConnectMessageLayer>(connectMessageLayer =>
-                {
-                    this.messageLayer = connectMessageLayer.MessageLayer;
 
-                    if (!this.announceMessageSent && this.isClient)
-                    {
-                        this.SendAnnounceMessage();
-                    }
-                });
+            this.Receive<Connected>(connected => this.ProcessConnected());
+
+            this.Receive<Disconnected>(disconnected => this.ProcessDisconnected());
 
             this.Receive<AnnounceMessage>(msg => this.ProcessAnnounceMessage(msg));
         }
@@ -56,13 +47,11 @@ namespace DI.P2P
             var response = Context.ActorSelection("/user/PeerRegistry")
                 .Ask<PeerRegistry.GetPeersResponse>(new PeerRegistry.GetPeers()).Result;
 
-            this.messageLayer.Tell(
+            Context.ActorSelection("../MessageLayer").Tell(
                 new AnnounceMessage
                     {
                         Peer = this.selfPeer,
-                        SoftwareVersion = Versions.SoftwareVersion,
-                        ProtocolVersion = Versions.ProtocolVersion,
-                        Peers = response.Peers,
+                        Peers = response.Peers.Select(p => p.Peer).ToArray(),
                         MyTime = DateTime.UtcNow
                     });
             this.announceMessageSent = true;
@@ -70,18 +59,20 @@ namespace DI.P2P
 
         private void ProcessAnnounceMessage(AnnounceMessage msg)
         {
-            this.log.Debug($"Announce received; {msg.Peer.Id} {msg.SoftwareVersion} - protocol {msg.ProtocolVersion}");
+            // Correct time difference in clocktime of both nodes.
             msg.Peer.AnnounceTime = DateTime.UtcNow;
+            var timeOffset = msg.Peer.AnnounceTime - msg.MyTime;
+            msg.Peers?.ForEach(p => p.AnnounceTime += timeOffset);
+
+            this.log.Debug($"Announce received; {msg.Peer}, time offset {timeOffset}");
+
+            this.connectedPeer = msg.Peer;
 
             if (!this.isClient)
             {
                 // Send response with an announce message and a list of peers.
                 this.SendAnnounceMessage();
             }
-
-            // Correct time difference in clocktime of both nodes.
-            var timeOffset = msg.Peer.AnnounceTime - msg.MyTime;
-            msg.Peers?.ForEach(p => p.AnnounceTime += timeOffset);
 
             if (string.IsNullOrWhiteSpace(msg.Peer.IpAddress))
             {
@@ -96,6 +87,22 @@ namespace DI.P2P
             {
                 peerRegistry.Tell(new PeerRegistry.AddPeers(msg.Peers));
             }
+        }
+
+        private void ProcessConnected()
+        {
+            if (!this.announceMessageSent && this.isClient)
+            {
+                this.SendAnnounceMessage();
+            }
+        }
+
+        private void ProcessDisconnected()
+        {
+            if (this.connectedPeer == null) return;
+
+            var peerRegistry = Context.ActorSelection("/user/PeerRegistry");
+            peerRegistry.Tell(new PeerRegistry.PeerDisconnected(this.connectedPeer));
         }
 
         public static Props Props(Peer selfPeer, bool isClient)

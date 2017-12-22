@@ -2,7 +2,7 @@
   "profiles": {
     "DI.P2P.Console": {
       "commandName": "Project",
-      "commandLineArgs": "11112 localhost:11111"
+      "commandLineArgs": "11113"
     }
   }
 }

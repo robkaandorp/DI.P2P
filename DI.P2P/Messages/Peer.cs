@@ -21,9 +21,15 @@ namespace DI.P2P.Messages
         [ProtoMember(4)]
         public DateTime AnnounceTime { get; set; }
 
+        [ProtoMember(5)]
+        public Version SoftwareVersion { get; set; }
+
+        [ProtoMember(6)]
+        public Version ProtocolVersion { get; set; }
+
         public override string ToString()
         {
-            return $"{this.Id} {this.IpAddress}:{this.Port}";
+            return $"{this.Id} {this.IpAddress}:{this.Port} {this.SoftwareVersion} protocol {this.ProtocolVersion}";
         }
     }
 }

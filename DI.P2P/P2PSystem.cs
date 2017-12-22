@@ -79,5 +79,17 @@
 
             this.peerPool.Tell(new PeerPool.ConnectTo { Peer = new Peer { IpAddress = ipAddress, Port = port } });
         }
+
+        public PeerInfo[] GetConnectedPeers()
+        {
+            var response = this.peerRegistry.Ask<PeerRegistry.GetConnectedPeersResponse>(new PeerRegistry.GetConnectedPeers()).Result;
+            return response.Peers;
+        }
+
+        public PeerInfo[] GetPeers()
+        {
+            var response = this.peerRegistry.Ask<PeerRegistry.GetPeersResponse>(new PeerRegistry.GetPeers()).Result;
+            return response.Peers;
+        }
     }
 }
