@@ -1,6 +1,7 @@
 ﻿namespace DI.P2P.Console.Cli
 {
     using System;
+    using System.Linq;
 
     using Akka.Util.Internal;
 
@@ -26,6 +27,15 @@
             Console.WriteLine("### Peers registry:");
             peers.ForEach(p => Console.WriteLine($" - {p.Peer} ({p.ConnectionTries} conn. tries)"));
             Console.WriteLine();
+
+            peers = this.commandPrompt.System.GetBannedPeers();
+
+            if (peers.Any())
+            {
+                Console.WriteLine("### Banned peers:");
+                peers.ForEach(p => Console.WriteLine($" - {p.Peer}"));
+                Console.WriteLine();
+            }
 
             return true;
         }

@@ -57,7 +57,8 @@ namespace DI.P2P
         private readonly Dictionary<byte, Type> messageTypeMap =
             new Dictionary<byte, Type>
             {
-                { (byte)AnnounceMessage.MessageType, typeof(AnnounceMessage) }
+                { (byte)AnnounceMessage.MessageType, typeof(AnnounceMessage) },
+                { (byte)DisconnectAndRemove.MessageType, typeof(DisconnectAndRemove) },
             };
 
         private void ProcessRawIncomingMessage(ByteString rawMsg)

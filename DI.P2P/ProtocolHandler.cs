@@ -38,6 +38,8 @@ namespace DI.P2P
             this.Receive<Disconnected>(disconnected => this.ProcessDisconnected());
 
             this.Receive<AnnounceMessage>(msg => this.ProcessAnnounceMessage(msg));
+
+            this.Receive<DisconnectAndRemove>(msg => this.ProcessDisconnectAndRemove(msg));
         }
 
         private bool announceMessageSent = false;
@@ -70,6 +72,15 @@ namespace DI.P2P
 
             if (!this.isClient)
             {
+                // Make sure we did not connect to ourselfs.
+                if (msg.Peer.Equals(this.selfPeer))
+                {
+                    this.log.Debug("Connected to ourselfs, requesting disconnect.");
+                    Context.ActorSelection("../MessageLayer")
+                        .Tell(new DisconnectAndRemove { Reason = "Self connection", Peer = this.selfPeer });
+                    return;
+                }
+
                 // Send response with an announce message and a list of peers.
                 this.SendAnnounceMessage();
             }
@@ -103,6 +114,24 @@ namespace DI.P2P
 
             var peerRegistry = Context.ActorSelection("/user/PeerRegistry");
             peerRegistry.Tell(new PeerRegistry.PeerDisconnected(this.connectedPeer));
+        }
+
+        private void ProcessDisconnectAndRemove(DisconnectAndRemove msg)
+        {
+            this.log.Debug($"DisconnectAndRemove received; reason '{msg.Reason}'");
+
+            msg.Peer.AnnounceTime = DateTime.UtcNow;
+
+            if (string.IsNullOrWhiteSpace(msg.Peer.IpAddress))
+            {
+                var response = Context.Parent.Ask<TcpConnection.GetRemoteIpResponse>(new TcpConnection.GetRemoteIp()).Result;
+                msg.Peer.IpAddress = response.IpAddress;
+            }
+
+            Context.ActorSelection("/user/PeerRegistry")
+                .Tell(new PeerRegistry.BanPeer(msg.Peer));
+
+            Context.Parent.Tell(new TcpConnection.Disconnect());
         }
 
         public static Props Props(Peer selfPeer, bool isClient)

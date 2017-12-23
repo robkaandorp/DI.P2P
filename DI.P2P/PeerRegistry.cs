@@ -36,6 +36,16 @@ namespace DI.P2P
             public bool IsConnected { get; }
         }
 
+        public class BanPeer
+        {
+            public Peer Peer { get; }
+
+            public BanPeer(Peer peer)
+            {
+                this.Peer = peer;
+            }
+        }
+
         public class AddPeers
         {
             public AddPeers(Peer[] peers)
@@ -70,6 +80,18 @@ namespace DI.P2P
             public PeerInfo[] Peers { get; }
         }
 
+        public class GetBannedPeers { }
+
+        public class GetBannedPeersResponse
+        {
+            public GetBannedPeersResponse(PeerInfo[] peers)
+            {
+                this.Peers = peers;
+            }
+
+            public PeerInfo[] Peers { get; }
+        }
+
         public class PeerDisconnected
         {
             public PeerDisconnected(Peer peer)
@@ -97,17 +119,23 @@ namespace DI.P2P
 
         private readonly List<PeerInfo> connectedPeers = new List<PeerInfo>(15);
 
+        private readonly List<PeerInfo> bannedPeers = new List<PeerInfo>(15);
+
         public PeerRegistry(Peer selfPeer)
         {
             this.selfPeer = selfPeer;
 
             this.Receive<AddPeer>(addPeer => this.ProcessAddPeer(addPeer));
 
+            this.Receive<BanPeer>(banPeer => this.ProcessBanPeer(banPeer));
+
             this.Receive<AddPeers>(addPeers => this.ProcessAddPeers(addPeers.Peers));
 
             this.Receive<GetPeers>(_ => this.ProcessGetPeers());
 
             this.Receive<GetConnectedPeers>(_ => this.ProcessGetConnectedPeers());
+
+            this.Receive<GetBannedPeers>(_ => this.ProcessGetBannedPeers());
 
             this.Receive<PeerDisconnected>(peerDisconnected => this.ProcessPeerDisconnected(peerDisconnected));
 
@@ -133,6 +161,12 @@ namespace DI.P2P
                 {
                     this.log.Debug($"Peer changed from {oldPeer.Peer} to {peer}");
                 }
+            }
+
+            if (this.bannedPeers.Any(p => p.Peer.Equals(peer)))
+            {
+                // Do not add banned peers to the registry.
+                return;
             }
 
             this.peers.Add(new PeerInfo { Peer = peer, ConnectionTries = oldPeer?.ConnectionTries ?? 0 });
@@ -161,6 +195,16 @@ namespace DI.P2P
             this.log.Debug($"Add peer {addPeer.Peer} to the registry");
         }
 
+        private void ProcessBanPeer(BanPeer banPeer)
+        {
+            var peerInfo = this.peers.FirstOrDefault(p => p.Peer.Equals(banPeer.Peer));
+
+            this.peers.Remove(peerInfo);
+            this.bannedPeers.Add(peerInfo);
+
+            this.log.Debug($"Banned peer {banPeer.Peer}");
+        }
+
         private void ProcessAddPeers(Peer[] newPeers)
         {
             var nonConnectedPeers = newPeers.Where(p => this.connectedPeers.All(cp => !cp.Peer.Equals(p)));
@@ -184,6 +228,11 @@ namespace DI.P2P
         private void ProcessGetConnectedPeers()
         {
             this.Sender.Tell(new GetConnectedPeersResponse(this.connectedPeers.ToArray()));
+        }
+
+        private void ProcessGetBannedPeers()
+        {
+            this.Sender.Tell(new GetBannedPeersResponse(this.bannedPeers.ToArray()));
         }
 
         private void ProcessPeerDisconnected(PeerDisconnected peerDisconnected)

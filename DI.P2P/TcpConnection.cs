@@ -26,6 +26,8 @@
             public string IpAddress { get; }
         }
 
+        public class Disconnect { }
+
 
         private readonly ILoggingAdapter log = Context.GetLogger();
 
@@ -59,9 +61,7 @@
         {
             switch (message)
             {
-                case Tcp.Received _:
-                    var received = (Tcp.Received)message;
-
+                case Tcp.Received received:
                     if (received.Data.IsEmpty)
                     {
                         return;
@@ -105,6 +105,10 @@
                     this.log.Debug($"ConnectionClosed; Shutting down peer.. {message}");
                     this.transportLayer.Tell(new TransportLayer.Disconnected());
                     this.Self.GracefulStop(TimeSpan.FromSeconds(10));
+                    break;
+
+                case Disconnect _:
+                    this.connection.Tell(Tcp.Close.Instance);
                     break;
 
                 default:

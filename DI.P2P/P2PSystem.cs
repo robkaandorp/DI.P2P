@@ -91,5 +91,11 @@
             var response = this.peerRegistry.Ask<PeerRegistry.GetPeersResponse>(new PeerRegistry.GetPeers()).Result;
             return response.Peers;
         }
+
+        public PeerInfo[] GetBannedPeers()
+        {
+            var response = this.peerRegistry.Ask<PeerRegistry.GetBannedPeersResponse>(new PeerRegistry.GetBannedPeers()).Result;
+            return response.Peers;
+        }
     }
 }
