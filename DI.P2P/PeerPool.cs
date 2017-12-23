@@ -82,7 +82,7 @@ namespace DI.P2P
 
             var unconnectedPeers = peersResponse.Peers
                 .OrderBy(p => p.ConnectionTries)    // Start trying with peers with the least connection tries
-                .Where(p => connectedPeersResponse.Peers.All(cp => p.Peer.Id != cp.Peer.Id))
+                .Where(p => connectedPeersResponse.Peers.All(cp => !p.Peer.Equals(cp.Peer)))
                 .Take(2);
 
             unconnectedPeers

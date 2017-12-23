@@ -4,6 +4,8 @@ using System.Text;
 
 namespace DI.P2P.Messages
 {
+    using System.Net;
+
     using ProtoBuf;
 
     [ProtoContract]
@@ -30,6 +32,20 @@ namespace DI.P2P.Messages
         public override string ToString()
         {
             return $"{this.Id} {this.IpAddress}:{this.Port} {this.SoftwareVersion} protocol {this.ProtocolVersion}";
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (!(obj is Peer other)) return false;
+
+            if (this.Id == other.Id) return true;
+
+            if (string.IsNullOrWhiteSpace(this.IpAddress) || string.IsNullOrWhiteSpace(other.IpAddress)) return false;
+
+            var myIp = IPAddress.Parse(this.IpAddress).MapToIPv6();
+            var otherIp = IPAddress.Parse(other.IpAddress).MapToIPv6();
+
+            return myIp.Equals(otherIp) && this.Port == other.Port;
         }
     }
 }

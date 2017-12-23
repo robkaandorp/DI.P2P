@@ -117,11 +117,10 @@ namespace DI.P2P
         private void Add(Peer peer, bool isConnected)
         {
             // Do not add ourselfs to the registry.
-            if (peer.Id == this.selfPeer.Id) return;
+            if (peer.Equals(this.selfPeer)) return;
 
             // Find the peer by id, or if that fails, find it by ip and port.
-            var oldPeer = this.peers.FirstOrDefault(p => p.Peer.Id == peer.Id) 
-                          ?? this.peers.FirstOrDefault(p => IPAddress.Parse(p.Peer.IpAddress).Equals(IPAddress.Parse(peer.IpAddress)) && p.Peer.Port == peer.Port);
+            var oldPeer = this.peers.FirstOrDefault(p => p.Peer.Equals(peer));
 
             // If the information we already have is newer, keep it.
             if (oldPeer != null && oldPeer.Peer.AnnounceTime > peer.AnnounceTime) return;
@@ -142,7 +141,7 @@ namespace DI.P2P
             // Update the connected peers list.
             if (!isConnected) return;
 
-            var oldConnectedPeer = this.connectedPeers.FirstOrDefault(p => p.Peer.Id == peer.Id);
+            var oldConnectedPeer = this.connectedPeers.FirstOrDefault(p => p.Peer.Equals(peer));
 
             if (oldConnectedPeer != null)
             {
@@ -164,7 +163,7 @@ namespace DI.P2P
 
         private void ProcessAddPeers(Peer[] newPeers)
         {
-            var nonConnectedPeers = newPeers.Where(p => this.connectedPeers.All(cp => cp.Peer.Id != p.Id));
+            var nonConnectedPeers = newPeers.Where(p => this.connectedPeers.All(cp => !cp.Peer.Equals(p)));
 
             foreach (var peer in nonConnectedPeers)
             {
@@ -189,7 +188,7 @@ namespace DI.P2P
 
         private void ProcessPeerDisconnected(PeerDisconnected peerDisconnected)
         {
-            var peer = this.connectedPeers.FirstOrDefault(cp => cp.Peer.Id == peerDisconnected.Peer.Id);
+            var peer = this.connectedPeers.FirstOrDefault(cp => cp.Peer.Equals(peerDisconnected.Peer));
 
             if (peer == null) return;
 
@@ -200,7 +199,7 @@ namespace DI.P2P
 
         private void ProcessTryConnection(TryConnection tryConnection)
         {
-            var peerInfo = this.peers.FirstOrDefault(p => p.Peer.Id == tryConnection.Peer.Id);
+            var peerInfo = this.peers.FirstOrDefault(p => p.Peer.Equals(tryConnection.Peer));
 
             if (peerInfo == null) return;
 
