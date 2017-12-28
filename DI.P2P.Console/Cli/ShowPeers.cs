@@ -28,12 +28,12 @@
             peers.ForEach(p => Console.WriteLine($" - {p.Peer} ({p.ConnectionTries} conn. tries)"));
             Console.WriteLine();
 
-            peers = this.commandPrompt.System.GetBannedPeers();
+            var bannedPeers = this.commandPrompt.System.GetBannedPeers();
 
             if (peers.Any())
             {
                 Console.WriteLine("### Banned peers:");
-                peers.ForEach(p => Console.WriteLine($" - {p.Peer}"));
+                bannedPeers.ForEach(p => Console.WriteLine($" - {p.Peer} (until {p.BannedUntil})"));
                 Console.WriteLine();
             }
 

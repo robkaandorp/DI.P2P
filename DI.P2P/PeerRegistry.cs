@@ -6,6 +6,7 @@ namespace DI.P2P
 {
     using System.Linq;
     using System.Net;
+    using System.Runtime.CompilerServices;
 
     using Akka.Actor;
     using Akka.Event;
@@ -17,6 +18,13 @@ namespace DI.P2P
         public Peer Peer { get; set; }
 
         public int ConnectionTries { get; set; }
+    }
+
+    public class BanInfo
+    {
+        public Peer Peer { get; set; }
+
+        public DateTime BannedUntil { get; set; }
     }
 
     public class PeerRegistry : ReceiveActor
@@ -40,9 +48,12 @@ namespace DI.P2P
         {
             public Peer Peer { get; }
 
-            public BanPeer(Peer peer)
+            public DateTime BannedUntil { get; }
+
+            public BanPeer(Peer peer, DateTime bannedUntil)
             {
                 this.Peer = peer;
+                this.BannedUntil = bannedUntil;
             }
         }
 
@@ -84,12 +95,12 @@ namespace DI.P2P
 
         public class GetBannedPeersResponse
         {
-            public GetBannedPeersResponse(PeerInfo[] peers)
+            public GetBannedPeersResponse(BanInfo[] peers)
             {
                 this.Peers = peers;
             }
 
-            public PeerInfo[] Peers { get; }
+            public BanInfo[] Peers { get; }
         }
 
         public class PeerDisconnected
@@ -112,6 +123,8 @@ namespace DI.P2P
             }
         }
 
+        public class DoHouseKeeping { }
+
 
         private readonly ILoggingAdapter log = Context.GetLogger();
 
@@ -119,7 +132,7 @@ namespace DI.P2P
 
         private readonly List<PeerInfo> connectedPeers = new List<PeerInfo>(15);
 
-        private readonly List<PeerInfo> bannedPeers = new List<PeerInfo>(15);
+        private readonly List<BanInfo> bannedPeers = new List<BanInfo>(15);
 
         public PeerRegistry(Peer selfPeer)
         {
@@ -140,6 +153,11 @@ namespace DI.P2P
             this.Receive<PeerDisconnected>(peerDisconnected => this.ProcessPeerDisconnected(peerDisconnected));
 
             this.Receive<TryConnection>(tryConnection => this.ProcessTryConnection(tryConnection));
+
+            this.Receive<DoHouseKeeping>(_ => this.ProcessDoHouseKeeping());
+
+            Context.System.Scheduler
+                .ScheduleTellRepeatedly(TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1), this.Self, new DoHouseKeeping(), ActorRefs.NoSender);
         }
 
         private void Add(Peer peer, bool isConnected)
@@ -199,10 +217,14 @@ namespace DI.P2P
         {
             var peerInfo = this.peers.FirstOrDefault(p => p.Peer.Equals(banPeer.Peer));
 
-            this.peers.Remove(peerInfo);
-            this.bannedPeers.Add(peerInfo);
+            if (peerInfo != null)
+            {
+                this.peers.Remove(peerInfo);
+            }
 
-            this.log.Debug($"Banned peer {banPeer.Peer}");
+            this.bannedPeers.Add(new BanInfo { Peer = banPeer.Peer, BannedUntil = banPeer.BannedUntil });
+
+            this.log.Debug($"Banned peer {banPeer.Peer} until {banPeer.BannedUntil}");
         }
 
         private void ProcessAddPeers(Peer[] newPeers)
@@ -253,6 +275,16 @@ namespace DI.P2P
             if (peerInfo == null) return;
 
             peerInfo.ConnectionTries++;
+        }
+
+        private void ProcessDoHouseKeeping()
+        {
+            var count = this.bannedPeers.RemoveAll(p => p.BannedUntil < DateTime.UtcNow);
+
+            if (count > 0)
+            {
+                this.log.Debug($"Cleaned up {count} bans.");
+            }
         }
 
         public static Props Props(Peer selfPeer)

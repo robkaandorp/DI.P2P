@@ -4,6 +4,7 @@ using System.Linq;
 
 namespace DI.P2P
 {
+    using System.Security.Cryptography;
     using System.Threading.Tasks;
 
     using DI.P2P.Messages;
@@ -14,10 +15,15 @@ namespace DI.P2P
 
         private readonly List<IComponent> components = new List<IComponent>();
 
+        private readonly RSAParameters rsaParameters;
+
         public Module(Guid id, int port = 11111)
         {
             this.Id = id;
             this.Port = port;
+
+            var rsa = RSA.Create();
+            this.rsaParameters = rsa.ExportParameters(true);
         }
 
         public Task Configure()
@@ -27,7 +33,13 @@ namespace DI.P2P
                                    Id = this.Id,
                                    Port = this.Port,
                                    SoftwareVersion = Versions.SoftwareVersion,
-                                   ProtocolVersion = Versions.ProtocolVersion
+                                   ProtocolVersion = Versions.ProtocolVersion,
+                                   RsaParameters = new RsaParameters
+                                                       {
+                                                           Exponent = this.rsaParameters.Exponent,
+                                                           Modulus = this.rsaParameters.Modulus
+                                                       },
+                                   InternalRsaParameters = this.rsaParameters
                                };
             return this.Add(new P2PSystem(this, selfPeer));
         }

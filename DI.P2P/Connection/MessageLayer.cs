@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace DI.P2P
+﻿namespace DI.P2P.Connection
 {
+    using System;
+    using System.Collections.Generic;
     using System.IO;
 
     using Akka.Actor;
@@ -59,6 +57,10 @@ namespace DI.P2P
             {
                 { (byte)AnnounceMessage.MessageType, typeof(AnnounceMessage) },
                 { (byte)DisconnectAndRemove.MessageType, typeof(DisconnectAndRemove) },
+                { (byte)KeyExchangeMessage.MessageType, typeof(KeyExchangeMessage) },
+                { (byte)BroadcastMessage.MessageType, typeof(BroadcastMessage) },
+                { (byte)Ping.MessageType, typeof(Ping) },
+                { (byte)Pong.MessageType, typeof(Pong) },
             };
 
         private void ProcessRawIncomingMessage(ByteString rawMsg)

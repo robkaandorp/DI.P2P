@@ -1,10 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace DI.P2P
+﻿namespace DI.P2P.Connection
 {
+    using System;
     using System.Linq;
+    using System.Security.Cryptography;
+    using System.Text;
 
     using Akka.Actor;
     using Akka.Event;
@@ -39,7 +38,18 @@ namespace DI.P2P
 
             this.Receive<AnnounceMessage>(msg => this.ProcessAnnounceMessage(msg));
 
+            this.Receive<KeyExchangeMessage>(keyExchangeMessage => this.ProcessKeyExchangeMessage(keyExchangeMessage));
+
             this.Receive<DisconnectAndRemove>(msg => this.ProcessDisconnectAndRemove(msg));
+
+            this.Receive<BroadcastMessage>(broadcastMessage => this.ProcessBroadcastMessage(broadcastMessage));
+
+            this.Receive<Ping>(ping => this.ProcessPing(ping));
+
+            this.Receive<Pong>(pong => this.ProcessPong(pong));
+
+            Context.System.Scheduler.ScheduleTellRepeatedly(
+                TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5), Context.ActorSelection("../MessageLayer"), new Ping(), this.Self);
         }
 
         private bool announceMessageSent = false;
@@ -69,6 +79,7 @@ namespace DI.P2P
             this.log.Debug($"Announce received; {msg.Peer}, time offset {timeOffset}");
 
             this.connectedPeer = msg.Peer;
+            this.SendKeyExchangeMessage();
 
             if (!this.isClient)
             {
@@ -129,9 +140,78 @@ namespace DI.P2P
             }
 
             Context.ActorSelection("/user/PeerRegistry")
-                .Tell(new PeerRegistry.BanPeer(msg.Peer));
+                .Tell(new PeerRegistry.BanPeer(msg.Peer, DateTime.UtcNow.AddDays(1)));
 
             Context.Parent.Tell(new TcpConnection.Disconnect());
+        }
+
+        private void SendKeyExchangeMessage()
+        {
+            var msg = new KeyExchangeMessage();
+
+            using (var aes = Aes.Create())
+            {
+                using (var rsa = new RSACryptoServiceProvider())
+                {
+                    rsa.ImportParameters(
+                        new RSAParameters
+                            {
+                                Modulus = this.connectedPeer.RsaParameters.Modulus,
+                                Exponent = this.connectedPeer.RsaParameters.Exponent
+                            });
+
+                    Context.ActorSelection("../TransportLayer").Tell(new TransportLayer.SetAesKeyIn(aes.Key, aes.IV));
+
+                    msg.Key = rsa.Encrypt(aes.Key, true);
+                    msg.Iv = aes.IV;
+                }
+            }
+
+            Context.ActorSelection("../MessageLayer").Tell(msg);
+        }
+
+        private void ProcessKeyExchangeMessage(KeyExchangeMessage keyExchangeMessage)
+        {
+            var key = keyExchangeMessage.Key;
+            var iv = keyExchangeMessage.Iv;
+
+            using (var rsa = new RSACryptoServiceProvider())
+            {
+                rsa.ImportParameters(this.selfPeer.InternalRsaParameters);
+                key = rsa.Decrypt(key, true);
+            }
+
+            Context.ActorSelection("../TransportLayer").Tell(new TransportLayer.SetAesKeyOut(key, iv));
+        }
+
+        private void ProcessBroadcastMessage(BroadcastMessage broadcastMessage)
+        {
+            // Immidiately send the message to all connected peers.
+            Context.ActorSelection("/*/MessageLayer").Tell(broadcastMessage);
+
+            var data = Encoding.UTF8.GetString(broadcastMessage.Data);
+            this.log.Info($"Received broadcast {broadcastMessage.Id} from {broadcastMessage.From}; '{data}'");
+        }
+
+        private void ProcessPing(Ping ping)
+        {
+            this.log.Debug($"Received ping from {this.connectedPeer}, returning pong.");
+            this.Sender.Tell(new Pong());
+
+            if (!ping.Data.Equals("ping"))
+            {
+                this.log.Error($"Ping data did not contain 'ping' but '{ping.Data}'.");
+            }
+        }
+
+        private void ProcessPong(Pong pong)
+        {
+            this.log.Debug($"Received pong from {this.connectedPeer}.");
+
+            if (!pong.Data.Equals("pong"))
+            {
+                this.log.Error($"Pong data did not contain 'pong' but '{pong.Data}'.");
+            }
         }
 
         public static Props Props(Peer selfPeer, bool isClient)

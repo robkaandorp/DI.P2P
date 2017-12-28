@@ -1,7 +1,6 @@
-﻿namespace DI.P2P
+﻿namespace DI.P2P.Connection
 {
     using System;
-    using System.Net;
 
     using Akka.Actor;
     using Akka.Event;

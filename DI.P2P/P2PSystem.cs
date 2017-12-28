@@ -21,6 +21,8 @@
 
         private IActorRef peerRegistry;
 
+        private IActorRef segmentManager;
+
         public P2PSystem(Module owner, Peer selfPeer)
         {
             this.selfPeer = selfPeer;
@@ -44,6 +46,7 @@
             this.tcpServer = this.system.ActorOf(TcpServer.Props(this.selfPeer), "TcpServer");
             this.peerPool = this.system.ActorOf(PeerPool.Props(this.selfPeer), "PeerPool");
             this.peerRegistry = this.system.ActorOf(PeerRegistry.Props(this.selfPeer), "PeerRegistry");
+            this.segmentManager = this.system.ActorOf(SegmentManager.Props(), "SegmentManager");
 
             this.IsRunning = true;
         }
@@ -92,10 +95,15 @@
             return response.Peers;
         }
 
-        public PeerInfo[] GetBannedPeers()
+        public BanInfo[] GetBannedPeers()
         {
             var response = this.peerRegistry.Ask<PeerRegistry.GetBannedPeersResponse>(new PeerRegistry.GetBannedPeers()).Result;
             return response.Peers;
+        }
+
+        public void BanPeer(string ipAddress, int port)
+        {
+            this.peerRegistry.Tell(new PeerRegistry.BanPeer(new Peer { IpAddress = ipAddress, Port = port }, DateTime.UtcNow.AddDays(1)));
         }
     }
 }

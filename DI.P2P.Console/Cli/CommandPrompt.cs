@@ -74,7 +74,8 @@
                     { "x", this.CreateCommand<Quit> },
                     { "q", this.CreateCommand<Quit> },
                     { "showpeers", this.CreateCommand<ShowPeers> },
-                    { "addnode", this.CreateCommand<AddNode> }
+                    { "addnode", this.CreateCommand<AddNode> },
+                    { "banpeer", this.CreateCommand<BanPeer> },
                 };
         }
 

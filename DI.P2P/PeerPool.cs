@@ -12,6 +12,7 @@ namespace DI.P2P
     using Akka.IO;
     using Akka.Util.Internal;
 
+    using DI.P2P.Connection;
     using DI.P2P.Messages;
 
     public class PeerPool : ReceiveActor

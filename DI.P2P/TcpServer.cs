@@ -10,6 +10,7 @@ namespace DI.P2P
     using Akka.Event;
     using Akka.IO;
 
+    using DI.P2P.Connection;
     using DI.P2P.Messages;
 
     /// <summary>
