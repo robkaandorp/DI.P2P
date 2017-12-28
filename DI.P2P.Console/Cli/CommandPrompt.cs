@@ -76,6 +76,7 @@
                     { "showpeers", this.CreateCommand<ShowPeers> },
                     { "addnode", this.CreateCommand<AddNode> },
                     { "banpeer", this.CreateCommand<BanPeer> },
+                    { "ping", this.CreateCommand<Ping> },
                 };
         }
 

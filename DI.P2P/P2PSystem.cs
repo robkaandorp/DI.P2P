@@ -1,13 +1,17 @@
 ﻿namespace DI.P2P
 {
     using System;
+    using System.Diagnostics;
     using System.Threading.Tasks;
 
     using Akka.Actor;
     using Akka.Configuration;
     using Akka.Configuration.Hocon;
 
+    using DI.P2P.Connection;
     using DI.P2P.Messages;
+
+    using Newtonsoft.Json.Bson;
 
     public class P2PSystem : IComponent
     {
@@ -65,7 +69,7 @@
 
         public Module Owner { get; }
 
-        public void AddNode(string node)
+        private (string ipAddress, int port) ParseIpAndPort(string node)
         {
             var parts = node.Split(':');
 
@@ -80,6 +84,12 @@
                 }
             }
 
+            return (ipAddress, port);
+        }
+
+        public void AddNode(string node)
+        {
+            var (ipAddress, port) = this.ParseIpAndPort(node);
             this.peerPool.Tell(new PeerPool.ConnectTo { Peer = new Peer { IpAddress = ipAddress, Port = port } });
         }
 
@@ -104,6 +114,32 @@
         public void BanPeer(string ipAddress, int port)
         {
             this.peerRegistry.Tell(new PeerRegistry.BanPeer(new Peer { IpAddress = ipAddress, Port = port }, DateTime.UtcNow.AddDays(1)));
+        }
+
+        private PeerInfo FindPeerInfo(Peer peer)
+        {
+            return this.peerRegistry.Ask<PeerInfo>(new PeerRegistry.FindPeerInfo(peer)).Result;
+        }
+
+        public TimeSpan Ping(string node)
+        {
+            var (ipAddress, port) = this.ParseIpAndPort(node);
+            var peerInfo = this.FindPeerInfo(new Peer { IpAddress = ipAddress, Port = port });
+
+            if (peerInfo == null)
+            {
+                throw new Exception("Peer not found.");
+            }
+
+            var sw = Stopwatch.StartNew();
+            var result = peerInfo.ProtocolHandler.Ask<ProtocolHandler.ReceivePong>(new ProtocolHandler.SendPing(), TimeSpan.FromSeconds(5)).Result;
+
+            if (!string.IsNullOrWhiteSpace(result.ErrorMsg))
+            {
+                throw new Exception(result.ErrorMsg);
+            }
+
+            return sw.Elapsed;
         }
     }
 }

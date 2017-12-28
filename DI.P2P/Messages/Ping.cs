@@ -4,6 +4,8 @@ using System.Text;
 
 namespace DI.P2P.Messages
 {
+    using Akka.Actor;
+
     using ProtoBuf;
 
     [ProtoContract]
@@ -11,8 +13,19 @@ namespace DI.P2P.Messages
     {
         public const MessageEnum MessageType = MessageEnum.Ping;
 
+        public Ping() { }
+
+        public Ping(byte[] data, string tellPath)
+        {
+            this.Data = data;
+            this.TellPath = tellPath;
+        }
+
         [ProtoMember(1)]
-        public string Data { get; } = "ping";
+        public byte[] Data { get; }
+
+        [ProtoMember(2)]
+        public string TellPath { get; }
 
         public override MessageEnum GetMessageType()
         {

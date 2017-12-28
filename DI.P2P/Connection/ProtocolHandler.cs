@@ -1,6 +1,7 @@
 ﻿namespace DI.P2P.Connection
 {
     using System;
+    using System.Collections.Generic;
     using System.Linq;
     using System.Security.Cryptography;
     using System.Text;
@@ -16,6 +17,18 @@
         public class Connected { }
 
         public class Disconnected { }
+
+        public class SendPing { }
+
+        public class ReceivePong
+        {
+            public string ErrorMsg { get; }
+
+            public ReceivePong(string errorMsg)
+            {
+                this.ErrorMsg = errorMsg;
+            }
+        }
 
 
         private readonly Peer selfPeer;
@@ -48,8 +61,10 @@
 
             this.Receive<Pong>(pong => this.ProcessPong(pong));
 
-            Context.System.Scheduler.ScheduleTellRepeatedly(
-                TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5), Context.ActorSelection("../MessageLayer"), new Ping(), this.Self);
+            this.Receive<SendPing>(sendPing => this.ProcessSendPing(sendPing));
+
+            //Context.System.Scheduler.ScheduleTellRepeatedly(
+            //    TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5), Context.ActorSelection("../MessageLayer"), new Ping(), this.Self);
         }
 
         private bool announceMessageSent = false;
@@ -160,10 +175,9 @@
                                 Exponent = this.connectedPeer.RsaParameters.Exponent
                             });
 
-                    Context.ActorSelection("../TransportLayer").Tell(new TransportLayer.SetAesKeyIn(aes.Key, aes.IV));
+                    Context.ActorSelection("../TransportLayer").Tell(new TransportLayer.SetAesKeyIn(aes.Key));
 
                     msg.Key = rsa.Encrypt(aes.Key, true);
-                    msg.Iv = aes.IV;
                 }
             }
 
@@ -173,7 +187,6 @@
         private void ProcessKeyExchangeMessage(KeyExchangeMessage keyExchangeMessage)
         {
             var key = keyExchangeMessage.Key;
-            var iv = keyExchangeMessage.Iv;
 
             using (var rsa = new RSACryptoServiceProvider())
             {
@@ -181,7 +194,7 @@
                 key = rsa.Decrypt(key, true);
             }
 
-            Context.ActorSelection("../TransportLayer").Tell(new TransportLayer.SetAesKeyOut(key, iv));
+            Context.ActorSelection("../TransportLayer").Tell(new TransportLayer.SetAesKeyOut(key));
         }
 
         private void ProcessBroadcastMessage(BroadcastMessage broadcastMessage)
@@ -196,22 +209,47 @@
         private void ProcessPing(Ping ping)
         {
             this.log.Debug($"Received ping from {this.connectedPeer}, returning pong.");
-            this.Sender.Tell(new Pong());
-
-            if (!ping.Data.Equals("ping"))
-            {
-                this.log.Error($"Ping data did not contain 'ping' but '{ping.Data}'.");
-            }
+            this.Sender.Tell(new Pong(ping.Data, ping.TellPath));
         }
 
         private void ProcessPong(Pong pong)
         {
             this.log.Debug($"Received pong from {this.connectedPeer}.");
 
-            if (!pong.Data.Equals("pong"))
+            string errorMsg = string.Empty;
+
+            if (pong.Data[0] != 0 || pong.Data[1] != 1 || pong.Data[2] != 2 || pong.Data[3] != 3)
             {
-                this.log.Error($"Pong data did not contain 'pong' but '{pong.Data}'.");
+                errorMsg = "Ping data garbled";
             }
+
+            if (!string.IsNullOrWhiteSpace(pong.TellPath))
+            {
+                if (this.pingQueue.TryDequeue(out var tellTo))
+                {
+                    if (!tellTo.Path.ToString().Equals(pong.TellPath))
+                    {
+                        errorMsg += "Responding to incorrect actor.";
+                    }
+
+                    tellTo.Tell(new ReceivePong(errorMsg));
+                }
+            }
+            else
+            {
+                if (!string.IsNullOrWhiteSpace(errorMsg))
+                {
+                    this.log.Error(errorMsg);
+                }
+            }
+        }
+
+        private readonly Queue<IActorRef> pingQueue = new Queue<IActorRef>();
+
+        private void ProcessSendPing(SendPing sendPing)
+        {
+            this.pingQueue.Enqueue(this.Sender);
+            Context.ActorSelection("../MessageLayer").Tell(new Ping(new byte[] { 0, 1, 2, 3 }, this.Sender.Path.ToString()));
         }
 
         public static Props Props(Peer selfPeer, bool isClient)

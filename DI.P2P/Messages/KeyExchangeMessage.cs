@@ -12,9 +12,6 @@
         [ProtoMember(1)]
         public byte[] Key { get; set; }
 
-        [ProtoMember(2)]
-        public byte[] Iv { get; set; }
-
         public override MessageEnum GetMessageType()
         {
             return MessageType;

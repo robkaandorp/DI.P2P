@@ -28,24 +28,18 @@
         {
             public byte[] Key { get; }
 
-            public byte[] Iv { get; }
-
-            public SetAesKeyIn(byte[] key, byte[] iv)
+            public SetAesKeyIn(byte[] key)
             {
                 this.Key = key;
-                this.Iv = iv;
             }
         }
 
         public class SetAesKeyOut
         {
-            public byte[] Iv { get; }
-
             public byte[] Key { get; }
 
-            public SetAesKeyOut(byte[] key, byte[] iv)
+            public SetAesKeyOut(byte[] key)
             {
-                this.Iv = iv;
                 this.Key = key;
             }
         }
@@ -136,7 +130,7 @@
             {
                 //message.CopyTo(this.aesIn.IV, 0, this.aesIn.IV.Length);
                 this.aesIn.IV = message.Slice(0, this.aesIn.IV.Length).ToArray();
-                this.log.Debug($"IV in: {string.Join("", this.aesIn.IV.Select(b => b.ToString("X2")))}");
+                //this.log.Debug($"IV in: {string.Join("", this.aesIn.IV.Select(b => b.ToString("X2")))}");
                 message = message.Slice(this.aesIn.IV.Length);
 
                 using (var decryptor = this.aesIn.CreateDecryptor())
@@ -159,7 +153,7 @@
             if (this.aesOut != null)
             {
                 this.aesOut.GenerateIV();
-                this.log.Debug($"IV out: {string.Join("", this.aesOut.IV.Select(b => b.ToString("X2")))}");
+                //this.log.Debug($"IV out: {string.Join("", this.aesOut.IV.Select(b => b.ToString("X2")))}");
 
                 using (var encryptor = this.aesOut.CreateEncryptor())
                 {

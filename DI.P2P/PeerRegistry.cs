@@ -18,6 +18,8 @@ namespace DI.P2P
         public Peer Peer { get; set; }
 
         public int ConnectionTries { get; set; }
+
+        public IActorRef ProtocolHandler { get; set; }
     }
 
     public class BanInfo
@@ -125,6 +127,16 @@ namespace DI.P2P
 
         public class DoHouseKeeping { }
 
+        public class FindPeerInfo
+        {
+            public Peer Peer { get; }
+
+            public FindPeerInfo(Peer peer)
+            {
+                this.Peer = peer;
+            }
+        }
+
 
         private readonly ILoggingAdapter log = Context.GetLogger();
 
@@ -156,11 +168,13 @@ namespace DI.P2P
 
             this.Receive<DoHouseKeeping>(_ => this.ProcessDoHouseKeeping());
 
+            this.Receive<FindPeerInfo>(findPeerInfo => this.ProcessFindPeerInfo(findPeerInfo));
+
             Context.System.Scheduler
                 .ScheduleTellRepeatedly(TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1), this.Self, new DoHouseKeeping(), ActorRefs.NoSender);
         }
 
-        private void Add(Peer peer, bool isConnected)
+        private void Add(Peer peer, IActorRef protocolHandler = null)
         {
             // Do not add ourselfs to the registry.
             if (peer.Equals(this.selfPeer)) return;
@@ -191,7 +205,7 @@ namespace DI.P2P
 
 
             // Update the connected peers list.
-            if (!isConnected) return;
+            if (protocolHandler == null) return;
 
             var oldConnectedPeer = this.connectedPeers.FirstOrDefault(p => p.Peer.Equals(peer));
 
@@ -200,12 +214,12 @@ namespace DI.P2P
                 this.connectedPeers.Remove(oldConnectedPeer);
             }
 
-            this.connectedPeers.Add(new PeerInfo { Peer = peer });
+            this.connectedPeers.Add(new PeerInfo { Peer = peer, ProtocolHandler = protocolHandler });
         }
 
         private void ProcessAddPeer(AddPeer addPeer)
         {
-            this.Add(addPeer.Peer, addPeer.IsConnected);
+            this.Add(addPeer.Peer, this.Sender);
 
             // Keep latest announced peers at the front of the list.
             this.peers.Sort((a, b) => a.Peer.AnnounceTime > b.Peer.AnnounceTime ? 1 : -1);
@@ -233,7 +247,7 @@ namespace DI.P2P
 
             foreach (var peer in nonConnectedPeers)
             {
-                this.Add(peer, false);
+                this.Add(peer);
             }
 
             // Keep latest announced peers at the front of the list.
@@ -285,6 +299,12 @@ namespace DI.P2P
             {
                 this.log.Debug($"Cleaned up {count} bans.");
             }
+        }
+
+        private void ProcessFindPeerInfo(FindPeerInfo findPeerInfo)
+        {
+            var peerInfo = this.connectedPeers.FirstOrDefault(p => p.Peer.Equals(findPeerInfo.Peer));
+            this.Sender.Tell(peerInfo);
         }
 
         public static Props Props(Peer selfPeer)
