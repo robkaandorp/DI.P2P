@@ -30,6 +30,18 @@
             }
         }
 
+        public class PingDequeue { }
+
+        public class SendBroadcast
+        {
+            public byte[] Data { get; }
+
+            public SendBroadcast(byte[] data)
+            {
+                this.Data = data;
+            }
+        }
+
 
         private readonly Peer selfPeer;
 
@@ -62,6 +74,10 @@
             this.Receive<Pong>(pong => this.ProcessPong(pong));
 
             this.Receive<SendPing>(sendPing => this.ProcessSendPing(sendPing));
+
+            this.Receive<PingDequeue>(_ => this.pingQueue.TryDequeue(out var _));
+
+            this.Receive<SendBroadcast>(sendBroadcast => this.ProcessSendBroadcast(sendBroadcast));
 
             //Context.System.Scheduler.ScheduleTellRepeatedly(
             //    TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5), Context.ActorSelection("../MessageLayer"), new Ping(), this.Self);
@@ -200,7 +216,7 @@
         private void ProcessBroadcastMessage(BroadcastMessage broadcastMessage)
         {
             // Immidiately send the message to all connected peers.
-            Context.ActorSelection("/*/MessageLayer").Tell(broadcastMessage);
+            //Context.ActorSelection("/*/MessageLayer").Tell(broadcastMessage);
 
             var data = Encoding.UTF8.GetString(broadcastMessage.Data);
             this.log.Info($"Received broadcast {broadcastMessage.Id} from {broadcastMessage.From}; '{data}'");
@@ -229,9 +245,10 @@
                 {
                     if (!tellTo.Path.ToString().Equals(pong.TellPath))
                     {
-                        errorMsg += "Responding to incorrect actor.";
+                        errorMsg += "Responding to wrong actor.";
                     }
 
+                    Context.Unwatch(tellTo);
                     tellTo.Tell(new ReceivePong(errorMsg));
                 }
             }
@@ -248,8 +265,20 @@
 
         private void ProcessSendPing(SendPing sendPing)
         {
+            Context.WatchWith(this.Sender, new PingDequeue());
             this.pingQueue.Enqueue(this.Sender);
             Context.ActorSelection("../MessageLayer").Tell(new Ping(new byte[] { 0, 1, 2, 3 }, this.Sender.Path.ToString()));
+        }
+
+        private void ProcessSendBroadcast(SendBroadcast sendBroadcast)
+        {
+            Context.ActorSelection("../MessageLayer").Tell(
+                new BroadcastMessage
+                    {
+                        Data = sendBroadcast.Data,
+                        From = this.selfPeer.Id,
+                        Id = Guid.NewGuid()
+                    });
         }
 
         public static Props Props(Peer selfPeer, bool isClient)

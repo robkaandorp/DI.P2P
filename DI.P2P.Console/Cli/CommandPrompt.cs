@@ -77,6 +77,7 @@
                     { "addnode", this.CreateCommand<AddNode> },
                     { "banpeer", this.CreateCommand<BanPeer> },
                     { "ping", this.CreateCommand<Ping> },
+                    { "broadcast", this.CreateCommand<Broadcast> },
                 };
         }
 

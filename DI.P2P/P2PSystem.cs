@@ -2,6 +2,7 @@
 {
     using System;
     using System.Diagnostics;
+    using System.Text;
     using System.Threading.Tasks;
 
     using Akka.Actor;
@@ -140,6 +141,17 @@
             }
 
             return sw.Elapsed;
+        }
+
+        public void Broadcast(string testString)
+        {
+            var peers = this.GetConnectedPeers();
+            var data = Encoding.UTF8.GetBytes(testString);
+
+            foreach (var peerInfo in peers)
+            {
+                peerInfo.ProtocolHandler.Tell(new ProtocolHandler.SendBroadcast(data));
+            }
         }
     }
 }
