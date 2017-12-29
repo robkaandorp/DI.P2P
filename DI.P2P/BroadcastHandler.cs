@@ -47,6 +47,8 @@ namespace DI.P2P
             this.Receive<BroadcastReceived>(broadcastReceived => this.ProcessBroadcastReceived(broadcastReceived));
 
             this.Receive<RegisterHandler>(registerHandler => this.handlers.Add(registerHandler.Handler));
+
+            // TODO implement houdkeeping to purge receivedBroadcasts
         }
 
         private void ProcessBroadcastReceived(BroadcastReceived broadcastReceived)
@@ -60,15 +62,13 @@ namespace DI.P2P
             var connectedPeersResponse = Context.ActorSelection("/user/PeerRegistry")
                 .Ask<PeerRegistry.GetConnectedPeersResponse>(new PeerRegistry.GetConnectedPeers()).Result;
 
-            foreach (var peer in connectedPeersResponse.Peers)
-            {
-                peer.ProtocolHandler.Tell(new ProtocolHandler.ForwardBroadcast(broadcastReceived.Message));
-            }
-
             var broadcastTo = connectedPeersResponse.Peers.Where(
                 pi => pi.Peer.Id != broadcastReceived.On.Id && pi.Peer.Id != broadcastReceived.Message.From);
 
-
+            foreach (var peer in broadcastTo)
+            {
+                peer.ProtocolHandler.Tell(new ProtocolHandler.ForwardBroadcast(broadcastReceived.Message));
+            }
 
             this.handlers.ForEach(handler => Task.Run(() => handler(broadcastReceived.Message)));
         }
