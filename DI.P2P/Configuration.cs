@@ -50,6 +50,28 @@ namespace DI.P2P
             }
         }
 
+        public class LoadBannedPeers { }
+
+        public class LoadBannedPeersReponse
+        {
+            public LoadBannedPeersReponse(BanInfo[] peers)
+            {
+                this.Peers = peers;
+            }
+
+            public BanInfo[] Peers { get; }
+        }
+
+        public class SaveBannedPeers
+        {
+            public BanInfo[] Peers { get; }
+
+            public SaveBannedPeers(BanInfo[] peers)
+            {
+                this.Peers = peers;
+            }
+        }
+
         public class GetSelf { }
 
         public class GetSelfResponse
@@ -104,12 +126,21 @@ namespace DI.P2P
 
             this.Receive<SavePeers>(savePeers => this.ProcessSavePeers(savePeers));
 
+            this.Receive<LoadBannedPeers>(loadBannedPeers => this.ProcessLoadBannedPeers(loadBannedPeers));
+
+            this.Receive<SaveBannedPeers>(saveBannedPeers => this.ProcessSaveBannedPeers(saveBannedPeers));
+
             this.Receive<GetSelf>(_ => this.Sender.Tell(new GetSelfResponse(this.selfPeer)));
         }
 
         private string GetPeersPath()
         {
             return Path.Combine(this.configurationDirectory, "peers.json");
+        }
+
+        private string GetBannedPeersPath()
+        {
+            return Path.Combine(this.configurationDirectory, "banned.json");
         }
 
         private string GetSelfPath()
@@ -186,6 +217,43 @@ namespace DI.P2P
             using (var jsonTextWriter = new JsonTextWriter(textWriter))
             {
                 serializer.Serialize(jsonTextWriter, savePeers.Peers);
+            }
+        }
+
+        private void ProcessLoadBannedPeers(LoadBannedPeers loadBannedPeers)
+        {
+            if (!File.Exists(this.GetBannedPeersPath()))
+            {
+                this.Sender.Tell(new LoadBannedPeersReponse(new BanInfo[] { }));
+                return;
+            }
+
+            try
+            {
+                var serializer = JsonSerializer.CreateDefault();
+
+                using (var textReader = new StreamReader(this.GetBannedPeersPath()))
+                using (var jsonTextReader = new JsonTextReader(textReader))
+                {
+                    var peers = serializer.Deserialize<BanInfo[]>(jsonTextReader);
+                    this.Sender.Tell(new LoadBannedPeersReponse(peers));
+                }
+            }
+            catch (Exception ex)
+            {
+                this.log.Error(ex, $"Exception while loading {this.GetBannedPeersPath()}");
+                this.Sender.Tell(new LoadBannedPeersReponse(new BanInfo[] { }));
+            }
+        }
+
+        private void ProcessSaveBannedPeers(SaveBannedPeers saveBannedPeers)
+        {
+            var serializer = JsonSerializer.CreateDefault();
+
+            using (var textWriter = new StreamWriter(this.GetBannedPeersPath(), false))
+            using (var jsonTextWriter = new JsonTextWriter(textWriter))
+            {
+                serializer.Serialize(jsonTextWriter, saveBannedPeers.Peers);
             }
         }
 

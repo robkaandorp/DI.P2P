@@ -42,6 +42,16 @@
             }
         }
 
+        public class ForwardBroadcast
+        {
+            public BroadcastMessage Message { get; }
+
+            public ForwardBroadcast(BroadcastMessage message)
+            {
+                this.Message = message;
+            }
+        }
+
 
         private readonly Peer selfPeer;
 
@@ -70,6 +80,8 @@
             this.Receive<DisconnectAndRemove>(msg => this.ProcessDisconnectAndRemove(msg));
 
             this.Receive<BroadcastMessage>(broadcastMessage => this.ProcessBroadcastMessage(broadcastMessage));
+
+            this.Receive<ForwardBroadcast>(forwardBroadcast => this.ProcessForwardBroadcast(forwardBroadcast));
 
             this.Receive<Ping>(ping => this.ProcessPing(ping));
 
@@ -217,11 +229,13 @@
 
         private void ProcessBroadcastMessage(BroadcastMessage broadcastMessage)
         {
-            // Immidiately send the message to all connected peers.
-            //Context.ActorSelection("/*/MessageLayer").Tell(broadcastMessage);
+            Context.ActorSelection("/user/BroadcastHandler")
+                .Tell(new BroadcastHandler.BroadcastReceived(broadcastMessage, this.connectedPeer));
+        }
 
-            var data = Encoding.UTF8.GetString(broadcastMessage.Data);
-            this.log.Info($"Received broadcast {broadcastMessage.Id} from {broadcastMessage.From}; '{data}'");
+        private void ProcessForwardBroadcast(ForwardBroadcast forwardBroadcast)
+        {
+            Context.ActorSelection("../MessageLayer").Tell(forwardBroadcast.Message);
         }
 
         private void ProcessPing(Ping ping)

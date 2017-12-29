@@ -5,6 +5,7 @@ namespace DI.P2P.Console
 {
     using System.Linq;
     using System.Reflection;
+    using System.Text;
 
     using Akka.Util.Internal;
 
@@ -49,7 +50,7 @@ namespace DI.P2P.Console
                 }
             }
 
-            // Port to bind to.
+            // Configuration directory.
             var configurationDirectory = "conf";
             var confDirArg = args.FirstOrDefault(arg => arg.StartsWith("--conf-dir="));
             if (confDirArg != null)
@@ -65,10 +66,26 @@ namespace DI.P2P.Console
                 configurationDirectory = confDirParts[1];
             }
 
+            // Data directory.
+            var dataDirectory = "data";
+            var dataDirArg = args.FirstOrDefault(arg => arg.StartsWith("--data-dir="));
+            if (dataDirArg != null)
+            {
+                var dataDirParts = dataDirArg.Split('=');
+
+                if (dataDirParts.Length < 2)
+                {
+                    Console.Error.WriteLine($"Missing data directory");
+                    Environment.Exit(1);
+                }
+
+                dataDirectory = dataDirParts[1];
+            }
+
 
             log.Info("DI.P2P.Console starting..");
 
-            var module = new Module(port, configurationDirectory);
+            var module = new Module(port, configurationDirectory, dataDirectory);
 
             module.Configure().Wait();
             module.Start().Wait();
@@ -85,6 +102,12 @@ namespace DI.P2P.Console
                     system.AddNode(addnodePart[1]);
                 }
             }
+
+            system.RegisterBroadcastHandler(msg =>
+                    {
+                        var data = Encoding.UTF8.GetString(msg.Data);
+                        Console.WriteLine($"Received broadcast {msg.Id} from {msg.From}; '{data}'");
+                    });
 
             new CommandPrompt(system).Start();
 

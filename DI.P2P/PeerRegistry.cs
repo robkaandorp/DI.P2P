@@ -175,6 +175,11 @@ namespace DI.P2P
             Context.System.Scheduler
                 .ScheduleTellRepeatedly(TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1), this.Self, new DoHouseKeeping(), ActorRefs.NoSender);
 
+            var loadBannedPeersReponse = Context.ActorSelection("/user/Configuration")
+                .Ask<Configuration.LoadBannedPeersReponse>(new Configuration.LoadBannedPeers()).Result;
+
+            this.bannedPeers.AddRange(loadBannedPeersReponse.Peers);
+
             var loadPeersReponse = Context.ActorSelection("/user/Configuration")
                 .Ask<Configuration.LoadPeersReponse>(new Configuration.LoadPeers()).Result;
 
@@ -233,6 +238,12 @@ namespace DI.P2P
                 .Tell(new Configuration.SavePeers(this.peers.Select(pi => pi.Peer).ToArray()));
         }
 
+        private void SaveBannedPeers()
+        {
+            Context.ActorSelection("/user/Configuration")
+                .Tell(new Configuration.SaveBannedPeers(this.bannedPeers.ToArray()));
+        }
+
         private void ProcessAddPeer(AddPeer addPeer)
         {
             this.Add(addPeer.Peer, this.Sender);
@@ -257,6 +268,8 @@ namespace DI.P2P
             this.bannedPeers.Add(new BanInfo { Peer = banPeer.Peer, BannedUntil = banPeer.BannedUntil });
 
             this.log.Debug($"Banned peer {banPeer.Peer} until {banPeer.BannedUntil}");
+
+            this.SaveBannedPeers();
         }
 
         private void ProcessAddPeers(Peer[] newPeers)
@@ -318,6 +331,7 @@ namespace DI.P2P
             if (count > 0)
             {
                 this.log.Debug($"Cleaned up {count} bans.");
+                this.SaveBannedPeers();
             }
         }
 

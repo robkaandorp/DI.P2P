@@ -1,0 +1,81 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace DI.P2P
+{
+    using System.Linq;
+    using System.Threading.Tasks;
+
+    using Akka.Actor;
+
+    using DI.P2P.Connection;
+    using DI.P2P.Messages;
+
+    public class BroadcastHandler : ReceiveActor
+    {
+        public class BroadcastReceived
+        {
+            public BroadcastReceived(BroadcastMessage message, Peer @on)
+            {
+                this.Message = message;
+                this.On = @on;
+            }
+
+            public BroadcastMessage Message { get; }
+
+            public Peer On { get; }
+        }
+
+        public class RegisterHandler
+        {
+            public RegisterHandler(Action<BroadcastMessage> handler)
+            {
+                this.Handler = handler;
+            }
+
+            public Action<BroadcastMessage> Handler { get; }
+        }
+
+
+        private readonly List<Action<BroadcastMessage>> handlers = new List<Action<BroadcastMessage>>();
+
+        private readonly Dictionary<Guid, DateTime> receivedBroadcasts = new Dictionary<Guid, DateTime>(1000);
+
+        public BroadcastHandler()
+        {
+            this.Receive<BroadcastReceived>(broadcastReceived => this.ProcessBroadcastReceived(broadcastReceived));
+
+            this.Receive<RegisterHandler>(registerHandler => this.handlers.Add(registerHandler.Handler));
+        }
+
+        private void ProcessBroadcastReceived(BroadcastReceived broadcastReceived)
+        {
+            // Stop processing if we already received the broadcast.
+            if (this.receivedBroadcasts.ContainsKey(broadcastReceived.Message.Id)) return;
+
+            this.receivedBroadcasts.Add(broadcastReceived.Message.Id, DateTime.UtcNow);
+
+            // Relay to all connection except the one we received the message on.
+            var connectedPeersResponse = Context.ActorSelection("/user/PeerRegistry")
+                .Ask<PeerRegistry.GetConnectedPeersResponse>(new PeerRegistry.GetConnectedPeers()).Result;
+
+            foreach (var peer in connectedPeersResponse.Peers)
+            {
+                peer.ProtocolHandler.Tell(new ProtocolHandler.ForwardBroadcast(broadcastReceived.Message));
+            }
+
+            var broadcastTo = connectedPeersResponse.Peers.Where(
+                pi => pi.Peer.Id != broadcastReceived.On.Id && pi.Peer.Id != broadcastReceived.Message.From);
+
+
+
+            this.handlers.ForEach(handler => Task.Run(() => handler(broadcastReceived.Message)));
+        }
+
+        public static Props Props()
+        {
+            return Akka.Actor.Props.Create(() => new BroadcastHandler());
+        }
+    }
+}

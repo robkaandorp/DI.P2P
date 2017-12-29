@@ -17,10 +17,11 @@ namespace DI.P2P
 
         private readonly RSAParameters rsaParameters;
 
-        public Module(int port = 11111, string configurationDirectory = "conf")
+        public Module(int port = 11111, string configurationDirectory = "conf", string dataDirectory = "data")
         {
             this.Port = port;
             this.ConfigurationDirectory = configurationDirectory;
+            this.DataDirectory = dataDirectory;
 
             var rsa = RSA.Create();
             this.rsaParameters = rsa.ExportParameters(true);
@@ -40,7 +41,7 @@ namespace DI.P2P
                                                            Modulus = this.rsaParameters.Modulus
                                                        }
                                };
-            return this.Add(new P2PSystem(this, selfPeer, this.ConfigurationDirectory, this.rsaParameters));
+            return this.Add(new P2PSystem(this, selfPeer, this.ConfigurationDirectory, this.rsaParameters, this.DataDirectory));
         }
 
         private async Task StartComponent(IComponent component)
@@ -116,5 +117,7 @@ namespace DI.P2P
         public int Port { get; set; }
 
         public string ConfigurationDirectory { get; }
+
+        public string DataDirectory { get; }
     }
 }

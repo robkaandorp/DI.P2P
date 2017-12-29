@@ -24,6 +24,8 @@ namespace DI.P2P
 
         private readonly RSAParameters rsaParameters;
 
+        private readonly string dataDirectory;
+
         private ActorSystem system;
 
         private IActorRef tcpServer;
@@ -36,11 +38,16 @@ namespace DI.P2P
 
         private IActorRef configuration;
 
-        public P2PSystem(Module owner, Peer selfPeer, string configurationDirectory, RSAParameters rsaParameters)
+        private IActorRef broadcastHandler;
+
+        private IActorRef persistence;
+
+        public P2PSystem(Module owner, Peer selfPeer, string configurationDirectory, RSAParameters rsaParameters, string dataDirectory)
         {
             this.selfPeer = selfPeer;
             this.configurationDirectory = configurationDirectory;
             this.rsaParameters = rsaParameters;
+            this.dataDirectory = dataDirectory;
             this.Owner = owner;
         }
 
@@ -59,6 +66,8 @@ namespace DI.P2P
 
             this.system = ActorSystem.Create("P2PSystem", config);
             this.configuration = this.system.ActorOf(Configuration.Props(this.configurationDirectory, this.rsaParameters, this.selfPeer), "Configuration");
+            this.persistence = this.system.ActorOf(Persistence.Props(this.dataDirectory), "Persistence");
+            this.broadcastHandler = this.system.ActorOf(BroadcastHandler.Props(), "BroadcastHandler");
             this.tcpServer = this.system.ActorOf(TcpServer.Props(), "TcpServer");
             this.peerPool = this.system.ActorOf(PeerPool.Props(), "PeerPool");
             this.peerRegistry = this.system.ActorOf(PeerRegistry.Props(), "PeerRegistry");
@@ -163,6 +172,11 @@ namespace DI.P2P
             {
                 peerInfo.ProtocolHandler.Tell(new ProtocolHandler.SendBroadcast(data));
             }
+        }
+
+        public void RegisterBroadcastHandler(Action<BroadcastMessage> handler)
+        {
+            this.broadcastHandler.Tell(new BroadcastHandler.RegisterHandler(handler));
         }
     }
 }
