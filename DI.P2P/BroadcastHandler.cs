@@ -14,6 +14,16 @@ namespace DI.P2P
 
     public class BroadcastHandler : ReceiveActor
     {
+        public class SendBroadcast
+        {
+            public byte[] Data { get; }
+
+            public SendBroadcast(byte[] data)
+            {
+                this.Data = data;
+            }
+        }
+
         public class BroadcastReceived
         {
             public BroadcastReceived(BroadcastMessage message, Peer @on)
@@ -42,13 +52,39 @@ namespace DI.P2P
 
         private readonly Dictionary<Guid, DateTime> receivedBroadcasts = new Dictionary<Guid, DateTime>(1000);
 
+        private readonly Peer selfPeer;
+
         public BroadcastHandler()
         {
+            var getSelfResponse = Context.ActorSelection("/user/Configuration")
+                .Ask<Configuration.GetSelfResponse>(new Configuration.GetSelf()).Result;
+            this.selfPeer = getSelfResponse.Self;
+
+            this.Receive<SendBroadcast>(sendBroadcast => this.ProcessSendBroadcast(sendBroadcast));
+
             this.Receive<BroadcastReceived>(broadcastReceived => this.ProcessBroadcastReceived(broadcastReceived));
 
             this.Receive<RegisterHandler>(registerHandler => this.handlers.Add(registerHandler.Handler));
 
             // TODO implement houdkeeping to purge receivedBroadcasts
+        }
+
+        private void ProcessSendBroadcast(SendBroadcast sendBroadcast)
+        {
+            var message = new BroadcastMessage
+                {
+                    Data = sendBroadcast.Data,
+                    From = this.selfPeer.Id,
+                    Id = Guid.NewGuid()
+                };
+
+            var response = Context.ActorSelection("/user/PeerRegistry")
+                .Ask<PeerRegistry.GetConnectedPeersResponse>(new PeerRegistry.GetConnectedPeers()).Result;
+
+            foreach (var peer in response.Peers)
+            {
+                peer.ProtocolHandler.Tell(new ProtocolHandler.ForwardBroadcast(message));
+            }
         }
 
         private void ProcessBroadcastReceived(BroadcastReceived broadcastReceived)

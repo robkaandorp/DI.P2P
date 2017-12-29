@@ -165,13 +165,8 @@ namespace DI.P2P
 
         public void Broadcast(string testString)
         {
-            var peers = this.GetConnectedPeers();
             var data = Encoding.UTF8.GetBytes(testString);
-
-            foreach (var peerInfo in peers)
-            {
-                peerInfo.ProtocolHandler.Tell(new ProtocolHandler.SendBroadcast(data));
-            }
+            this.broadcastHandler.Tell(new BroadcastHandler.SendBroadcast(data));
         }
 
         public void RegisterBroadcastHandler(Action<BroadcastMessage> handler)
