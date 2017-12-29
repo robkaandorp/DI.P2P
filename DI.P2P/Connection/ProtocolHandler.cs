@@ -49,13 +49,15 @@
 
         private readonly bool isClient;
 
+        private readonly RSAParameters rsaParameters;
+
         private readonly ILoggingAdapter log = Context.GetLogger();
 
-        public ProtocolHandler(Peer selfPeer, bool isClient)
+        public ProtocolHandler(Peer selfPeer, bool isClient, RSAParameters rsaParameters)
         {
             this.selfPeer = selfPeer;
             this.isClient = isClient;
-
+            this.rsaParameters = rsaParameters;
 
             this.Receive<Connected>(connected => this.ProcessConnected());
 
@@ -206,7 +208,7 @@
 
             using (var rsa = new RSACryptoServiceProvider())
             {
-                rsa.ImportParameters(this.selfPeer.InternalRsaParameters);
+                rsa.ImportParameters(this.rsaParameters);
                 key = rsa.Decrypt(key, true);
             }
 
@@ -281,9 +283,9 @@
                     });
         }
 
-        public static Props Props(Peer selfPeer, bool isClient)
+        public static Props Props(Peer selfPeer, bool isClient, RSAParameters rsaParameters)
         {
-            return Akka.Actor.Props.Create(() => new ProtocolHandler(selfPeer, isClient));
+            return Akka.Actor.Props.Create(() => new ProtocolHandler(selfPeer, isClient, rsaParameters));
         }
     }
 }

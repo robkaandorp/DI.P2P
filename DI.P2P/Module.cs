@@ -17,10 +17,10 @@ namespace DI.P2P
 
         private readonly RSAParameters rsaParameters;
 
-        public Module(Guid id, int port = 11111)
+        public Module(int port = 11111, string configurationDirectory = "conf")
         {
-            this.Id = id;
             this.Port = port;
+            this.ConfigurationDirectory = configurationDirectory;
 
             var rsa = RSA.Create();
             this.rsaParameters = rsa.ExportParameters(true);
@@ -30,7 +30,7 @@ namespace DI.P2P
         {
             var selfPeer = new Peer
                                {
-                                   Id = this.Id,
+                                   Id = Guid.Empty, // Reuse old Id or generate a new.
                                    Port = this.Port,
                                    SoftwareVersion = Versions.SoftwareVersion,
                                    ProtocolVersion = Versions.ProtocolVersion,
@@ -38,10 +38,9 @@ namespace DI.P2P
                                                        {
                                                            Exponent = this.rsaParameters.Exponent,
                                                            Modulus = this.rsaParameters.Modulus
-                                                       },
-                                   InternalRsaParameters = this.rsaParameters
+                                                       }
                                };
-            return this.Add(new P2PSystem(this, selfPeer));
+            return this.Add(new P2PSystem(this, selfPeer, this.ConfigurationDirectory, this.rsaParameters));
         }
 
         private async Task StartComponent(IComponent component)
@@ -115,5 +114,7 @@ namespace DI.P2P
 
         public Guid Id { get; set; }
         public int Port { get; set; }
+
+        public string ConfigurationDirectory { get; }
     }
 }

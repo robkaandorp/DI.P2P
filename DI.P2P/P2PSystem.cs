@@ -1,7 +1,9 @@
-﻿namespace DI.P2P
+﻿#pragma warning disable 1998
+namespace DI.P2P
 {
     using System;
     using System.Diagnostics;
+    using System.Security.Cryptography;
     using System.Text;
     using System.Threading.Tasks;
 
@@ -18,6 +20,10 @@
     {
         private readonly Peer selfPeer;
 
+        private readonly string configurationDirectory;
+
+        private readonly RSAParameters rsaParameters;
+
         private ActorSystem system;
 
         private IActorRef tcpServer;
@@ -28,9 +34,13 @@
 
         private IActorRef segmentManager;
 
-        public P2PSystem(Module owner, Peer selfPeer)
+        private IActorRef configuration;
+
+        public P2PSystem(Module owner, Peer selfPeer, string configurationDirectory, RSAParameters rsaParameters)
         {
             this.selfPeer = selfPeer;
+            this.configurationDirectory = configurationDirectory;
+            this.rsaParameters = rsaParameters;
             this.Owner = owner;
         }
 
@@ -48,9 +58,10 @@
                 }");
 
             this.system = ActorSystem.Create("P2PSystem", config);
-            this.tcpServer = this.system.ActorOf(TcpServer.Props(this.selfPeer), "TcpServer");
-            this.peerPool = this.system.ActorOf(PeerPool.Props(this.selfPeer), "PeerPool");
-            this.peerRegistry = this.system.ActorOf(PeerRegistry.Props(this.selfPeer), "PeerRegistry");
+            this.configuration = this.system.ActorOf(Configuration.Props(this.configurationDirectory, this.rsaParameters, this.selfPeer), "Configuration");
+            this.tcpServer = this.system.ActorOf(TcpServer.Props(), "TcpServer");
+            this.peerPool = this.system.ActorOf(PeerPool.Props(), "PeerPool");
+            this.peerRegistry = this.system.ActorOf(PeerRegistry.Props(), "PeerRegistry");
             this.segmentManager = this.system.ActorOf(SegmentManager.Props(), "SegmentManager");
 
             this.IsRunning = true;

@@ -7,6 +7,8 @@ namespace DI.P2P.Messages
     using System.Net;
     using System.Security.Cryptography;
 
+    using Newtonsoft.Json;
+
     using ProtoBuf;
 
     [ProtoContract]
@@ -43,9 +45,6 @@ namespace DI.P2P.Messages
         [ProtoMember(7)]
         public RsaParameters RsaParameters { get; set; }
 
-        [ProtoIgnore]
-        public RSAParameters InternalRsaParameters { get; set; }
-
         public override string ToString()
         {
             var id = string.Empty;
@@ -81,6 +80,15 @@ namespace DI.P2P.Messages
             var otherIp = IPAddress.Parse(other.IpAddress).MapToIPv6();
 
             return myIp.Equals(otherIp) && this.Port == other.Port;
+        }
+
+        public override int GetHashCode()
+        {
+            var hashCode = 1228683562;
+            hashCode = hashCode * -1521134295 + EqualityComparer<Guid>.Default.GetHashCode(this.Id);
+            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(this.IpAddress);
+            hashCode = hashCode * -1521134295 + this.Port.GetHashCode();
+            return hashCode;
         }
     }
 }

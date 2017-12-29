@@ -146,9 +146,11 @@ namespace DI.P2P
 
         private readonly List<BanInfo> bannedPeers = new List<BanInfo>(15);
 
-        public PeerRegistry(Peer selfPeer)
+        public PeerRegistry()
         {
-            this.selfPeer = selfPeer;
+            var getSelfResponse = Context.ActorSelection("/user/Configuration")
+                .Ask<Configuration.GetSelfResponse>(new Configuration.GetSelf()).Result;
+            this.selfPeer = getSelfResponse.Self;
 
             this.Receive<AddPeer>(addPeer => this.ProcessAddPeer(addPeer));
 
@@ -172,6 +174,14 @@ namespace DI.P2P
 
             Context.System.Scheduler
                 .ScheduleTellRepeatedly(TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1), this.Self, new DoHouseKeeping(), ActorRefs.NoSender);
+
+            var loadPeersReponse = Context.ActorSelection("/user/Configuration")
+                .Ask<Configuration.LoadPeersReponse>(new Configuration.LoadPeers()).Result;
+
+            foreach (var peer in loadPeersReponse.Peers)
+            {
+                this.Add(peer);
+            }
         }
 
         private void Add(Peer peer, IActorRef protocolHandler = null)
@@ -217,6 +227,12 @@ namespace DI.P2P
             this.connectedPeers.Add(new PeerInfo { Peer = peer, ProtocolHandler = protocolHandler });
         }
 
+        private void SavePeers()
+        {
+            Context.ActorSelection("/user/Configuration")
+                .Tell(new Configuration.SavePeers(this.peers.Select(pi => pi.Peer).ToArray()));
+        }
+
         private void ProcessAddPeer(AddPeer addPeer)
         {
             this.Add(addPeer.Peer, this.Sender);
@@ -225,6 +241,8 @@ namespace DI.P2P
             this.peers.Sort((a, b) => a.Peer.AnnounceTime > b.Peer.AnnounceTime ? 1 : -1);
 
             this.log.Debug($"Add peer {addPeer.Peer} to the registry");
+
+            this.SavePeers();
         }
 
         private void ProcessBanPeer(BanPeer banPeer)
@@ -254,6 +272,8 @@ namespace DI.P2P
             this.peers.Sort((a, b) => a.Peer.AnnounceTime > b.Peer.AnnounceTime ? 1 : -1);
 
             this.log.Debug($"Added {newPeers.Length} peers to the registry");
+
+            this.SavePeers();
         }
 
         private void ProcessGetPeers()
@@ -307,9 +327,9 @@ namespace DI.P2P
             this.Sender.Tell(peerInfo);
         }
 
-        public static Props Props(Peer selfPeer)
+        public static Props Props()
         {
-            return Akka.Actor.Props.Create(() => new PeerRegistry(selfPeer));
+            return Akka.Actor.Props.Create(() => new PeerRegistry());
         }
     }
 }

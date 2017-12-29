@@ -22,9 +22,12 @@ namespace DI.P2P
 
         private readonly ILoggingAdapter log = Context.GetLogger();
 
-        public TcpServer(Peer selfPeer)
+        public TcpServer()
         {
-            this.selfPeer = selfPeer;
+            var getSelfResponse = Context.ActorSelection("/user/Configuration")
+                .Ask<Configuration.GetSelfResponse>(new Configuration.GetSelf()).Result;
+            this.selfPeer = getSelfResponse.Self;
+
             Context.System.Tcp().Tell(new Tcp.Bind(this.Self, new IPEndPoint(IPAddress.Any, this.selfPeer.Port)));
         }
 
@@ -47,9 +50,9 @@ namespace DI.P2P
             }
         }
 
-        public static Props Props(Peer selfPeer)
+        public static Props Props()
         {
-            return Akka.Actor.Props.Create(() => new TcpServer(selfPeer));
+            return Akka.Actor.Props.Create(() => new TcpServer());
         }
     }
 }

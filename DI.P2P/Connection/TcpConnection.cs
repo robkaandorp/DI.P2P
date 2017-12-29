@@ -82,7 +82,10 @@
                             this.connection.Tell(Tcp.Write.Create(ByteString.FromBytes(new[] { this.transportLayerVersion })));
                         }
 
-                        var protocolHandler = Context.ActorOf(ProtocolHandler.Props(this.selfPeer, this.isClient), "ProtocolHandler");
+                        var rsaParametersResponse = Context.ActorSelection("/user/Configuration")
+                            .Ask<Configuration.GetRsaParametersResponse>(new Configuration.GetRsaParameters()).Result;
+
+                        var protocolHandler = Context.ActorOf(ProtocolHandler.Props(this.selfPeer, this.isClient, rsaParametersResponse.RsaParameters), "ProtocolHandler");
                         var messageLayer = Context.ActorOf(MessageLayer.Props(protocolHandler), "MessageLayer");
                         this.transportLayer = Context.ActorOf(TransportLayer.Props(this.Self, this.transportLayerVersion, messageLayer), "TransportLayer");
 

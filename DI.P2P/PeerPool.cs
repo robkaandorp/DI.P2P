@@ -29,9 +29,11 @@ namespace DI.P2P
 
         private readonly ILoggingAdapter log = Context.GetLogger();
 
-        public PeerPool(Peer selfPeer)
+        public PeerPool()
         {
-            this.selfPeer = selfPeer;
+            var getSelfResponse = Context.ActorSelection("/user/Configuration")
+                .Ask<Configuration.GetSelfResponse>(new Configuration.GetSelf()).Result;
+            this.selfPeer = getSelfResponse.Self;
 
             this.Receive<ConnectTo>(connectTo => this.ProcessConnectTo(connectTo));
 
@@ -96,9 +98,9 @@ namespace DI.P2P
                     });
         }
 
-        public static Props Props(Peer selfPeer)
+        public static Props Props()
         {
-            return Akka.Actor.Props.Create(() => new PeerPool(selfPeer));
+            return Akka.Actor.Props.Create(() => new PeerPool());
         }
     }
 }
