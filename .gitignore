@@ -31,3 +31,5 @@ packages
 /.vs/DI.P2P/v15/Server/sqlite3
 conf/
 conf2/
+
+DI\.P2P\.Console/conf3/
