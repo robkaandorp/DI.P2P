@@ -10,7 +10,7 @@ namespace DI.P2P
 
     using Akka.Actor;
     using Akka.Event;
-
+    using DI.P2P.Connection;
     using DI.P2P.Messages;
 
     public class PeerInfo
@@ -197,8 +197,15 @@ namespace DI.P2P
             // Find the peer by id, or if that fails, find it by ip and port.
             var oldPeer = this.peers.FirstOrDefault(p => p.Peer.Equals(peer));
 
-            // If the information we already have is newer, keep it.
-            if (oldPeer != null && oldPeer.Peer.AnnounceTime > peer.AnnounceTime) return;
+            // If the information we already have is newer, keep it, but use the protocolHandler if defined.
+            if (oldPeer != null && oldPeer.Peer.AnnounceTime > peer.AnnounceTime)
+            {
+                if (protocolHandler != null)
+                {
+                    oldPeer.ProtocolHandler = protocolHandler;
+                }
+                return;
+            }
 
             if (oldPeer != null)
             {
@@ -207,6 +214,12 @@ namespace DI.P2P
                 if (oldPeer.Peer.Id != peer.Id)
                 {
                     this.log.Debug($"Peer changed from {oldPeer.Peer} to {peer}");
+                }
+
+                if (protocolHandler == null && oldPeer.ProtocolHandler != null)
+                {
+                    // Keep the existing connection.
+                    protocolHandler = oldPeer.ProtocolHandler;
                 }
             }
 
@@ -258,7 +271,21 @@ namespace DI.P2P
 
         private void ProcessBanPeer(BanPeer banPeer)
         {
-            var peerInfo = this.peers.FirstOrDefault(p => p.Peer.Equals(banPeer.Peer));
+            var peerInfo = this.connectedPeers.FirstOrDefault(p => p.Peer.Equals(banPeer.Peer));
+
+            if (peerInfo != null)
+            {
+                if (peerInfo.ProtocolHandler != null)
+                {
+                    // Disconnect peer.
+                    peerInfo.ProtocolHandler.Tell(new ProtocolHandler.Disconnect());
+                    log.Debug($"Banned peer {peerInfo.Peer} disconnected.");
+                }
+
+                this.peers.Remove(peerInfo);
+            }
+
+            peerInfo = this.peers.FirstOrDefault(p => p.Peer.Equals(banPeer.Peer));
 
             if (peerInfo != null)
             {

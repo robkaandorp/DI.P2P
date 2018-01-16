@@ -2,7 +2,7 @@
   "profiles": {
     "DI.P2P.Console": {
       "commandName": "Project",
-      "commandLineArgs": "11113"
+      "commandLineArgs": "--port=11113 --conf-dir=conf3 --data-dir=data3"
     }
   }
 }

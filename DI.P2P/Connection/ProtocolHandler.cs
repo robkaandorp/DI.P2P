@@ -42,6 +42,8 @@
             }
         }
 
+        public class Disconnect { }
+
 
         private readonly Peer selfPeer;
 
@@ -80,6 +82,8 @@
             this.Receive<SendPing>(sendPing => this.ProcessSendPing(sendPing));
 
             this.Receive<PingDequeue>(_ => this.pingQueue.TryDequeue(out var _));
+
+            this.Receive<Disconnect>(_ => this.ProcessDisconnect());
 
             //Context.System.Scheduler.ScheduleTellRepeatedly(
             //    TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5), Context.ActorSelection("../MessageLayer"), new Ping(), this.Self);
@@ -174,8 +178,6 @@
 
             Context.ActorSelection("/user/PeerRegistry")
                 .Tell(new PeerRegistry.BanPeer(msg.Peer, DateTime.UtcNow.AddDays(1)));
-
-            Context.Parent.Tell(new TcpConnection.Disconnect());
         }
 
         private void SendKeyExchangeMessage()
@@ -272,6 +274,11 @@
             Context.WatchWith(this.Sender, new PingDequeue());
             this.pingQueue.Enqueue(this.Sender);
             Context.ActorSelection("../MessageLayer").Tell(new Ping(new byte[] { 0, 1, 2, 3 }, this.Sender.Path.ToString()));
+        }
+
+        private void ProcessDisconnect()
+        {
+            Context.Parent.Tell(new TcpConnection.Disconnect());
         }
 
         public static Props Props(Peer selfPeer, bool isClient, RSAParameters rsaParameters)
